@@ -231,22 +231,15 @@ fun NearbyDevicesScreen(navController: NavController) {
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(butlerScanResults) { result ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(text = getSsid(result))
-                                        Text(text = "${result.level} dBm")
-                                    }
-                                    Button(onClick = {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
                                         coroutineScope.launch {
                                             val ssid = getSsid(result)
-                                            val qrData = db.qrDataDao().getQrDataByName(ssid)
+                                            val qrData = db
+                                                .qrDataDao()
+                                                .getQrDataByName(ssid)
                                             if (qrData != null) {
                                                 val qrDataJson = Gson().toJson(qrData)
                                                 val encodedQrData = URLEncoder.encode(
@@ -258,8 +251,18 @@ fun NearbyDevicesScreen(navController: NavController) {
                                                 showDeviceNotKnownDialog = true
                                             }
                                         }
-                                    }) {
-                                        Text("Connect")
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(text = getSsid(result))
+                                        Text(text = "${result.level} dBm")
                                     }
                                 }
                             }

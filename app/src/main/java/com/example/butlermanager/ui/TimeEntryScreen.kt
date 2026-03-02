@@ -1,5 +1,6 @@
 package com.example.butlermanager.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,12 +53,14 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
     val context = LocalContext.current
     val db = TimeEntryDatabase.getDatabase(context)
     val scope = rememberCoroutineScope()
-    var timeSlots by remember { mutableStateOf(emptyList<TimeSlot>()) }
-    var initialTimeSlots by remember { mutableStateOf(emptyList<TimeSlot>()) }
     var advancedSettingsChanged by remember { mutableStateOf(false) }
     var isProvisioning by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var allConfigs by remember { mutableStateOf<List<TimeEntryConfiguration>>(emptyList()) }
+
+    BackHandler {
+        navController.navigate("qrScanner")
+    }
 
     if (showImportDialog) {
         AlertDialog(
@@ -80,7 +83,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                                                 db.timeEntryDao().getConfigurationWithTimeSlots(config.name)
                                             if (configWithTimeSlots != null) {
                                                 val importedTimeSlots = configWithTimeSlots.timeSlots
-                                                val newTimeSlots = List(15) { index ->
+                                                espressifManager.timeSlots = List(15) { index ->
                                                     importedTimeSlots.find { it.rowIndex == index }?.copy(
                                                         id = 0,
                                                         configurationName = name
@@ -93,7 +96,6 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                                                         onOff = 0
                                                     )
                                                 }
-                                                timeSlots = newTimeSlots
                                             }
                                             showImportDialog = false
                                         }
@@ -130,29 +132,40 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
     }
 
     LaunchedEffect(key1 = name) {
-        scope.launch {
-            val configWithTimeSlots = db.timeEntryDao().getConfigurationWithTimeSlots(name)
-            val loadedTimeSlots = if (configWithTimeSlots != null) {
-                val existingTimeSlots = configWithTimeSlots.timeSlots
-                List(15) { index ->
-                    existingTimeSlots.find { it.rowIndex == index } ?: TimeSlot(
-                        configurationName = name,
-                        rowIndex = index,
-                        channel = 0,
-                        hour = 24,
-                        minute = 0,
-                        onOff = 0
-                    )
+        if (espressifManager.timeSlots.isEmpty() || espressifManager.timeSlots.first().configurationName != name) {
+            scope.launch {
+                val configWithTimeSlots = db.timeEntryDao().getConfigurationWithTimeSlots(name)
+                val loadedTimeSlots = if (configWithTimeSlots != null) {
+                    val existingTimeSlots = configWithTimeSlots.timeSlots
+                    List(15) { index ->
+                        existingTimeSlots.find { it.rowIndex == index } ?: TimeSlot(
+                            configurationName = name,
+                            rowIndex = index,
+                            channel = 0,
+                            hour = 24,
+                            minute = 0,
+                            onOff = 0
+                        )
+                    }
+                } else {
+                    List(15) {
+                        TimeSlot(
+                            configurationName = name,
+                            rowIndex = it,
+                            channel = 0,
+                            hour = 24,
+                            minute = 0,
+                            onOff = 0
+                        )
+                    }
                 }
-            } else {
-                List(15) { TimeSlot(configurationName = name, rowIndex = it, channel = 0, hour = 24, minute = 0, onOff = 0) }
+                espressifManager.timeSlots = loadedTimeSlots
+                espressifManager.initialTimeSlots = loadedTimeSlots
             }
-            timeSlots = loadedTimeSlots
-            initialTimeSlots = loadedTimeSlots
         }
     }
 
-    val isFormDirty = (timeSlots != initialTimeSlots) || advancedSettingsChanged
+    val isFormDirty = (espressifManager.timeSlots != espressifManager.initialTimeSlots) || advancedSettingsChanged
 
     Column(
         modifier = Modifier
@@ -164,8 +177,8 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
         Spacer(modifier = Modifier.height(16.dp))
 
         TimeEntryList(
-            timeSlots = timeSlots,
-            onTimeSlotsChanged = { timeSlots = it },
+            timeSlots = espressifManager.timeSlots,
+            onTimeSlotsChanged = { espressifManager.timeSlots = it },
             modifier = Modifier.weight(1f)
         )
 
@@ -182,10 +195,13 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
             onUpdate = {
                 scope.launch {
                     isProvisioning = true
-                    db.timeEntryDao().updateTimeSlotsForConfiguration(name, timeSlots)
+                    db.timeEntryDao().updateTimeSlotsForConfiguration(name, espressifManager.timeSlots)
                     espressifManager.writeCronData()
+                    if (advancedSettingsChanged) {
+                        espressifManager.writeAdvancedConfigs()
+                    }
                     espressifManager.provision()
-                    initialTimeSlots = timeSlots
+                    espressifManager.initialTimeSlots = espressifManager.timeSlots
                     advancedSettingsChanged = false
                     isProvisioning = false
                     navController.navigate("qrScanner")

@@ -2,16 +2,18 @@ package com.example.butlermanager
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.espressif.provisioning.DeviceConnectionEvent
 import com.espressif.provisioning.ESPConstants
 import com.espressif.provisioning.ESPDevice
 import com.espressif.provisioning.ESPProvisionManager
 import com.espressif.provisioning.listeners.ProvisionListener
 import com.espressif.provisioning.listeners.ResponseListener
-import com.example.butlermanager.data.TimeEntryDatabase
 import com.example.butlermanager.data.QrData
+import com.example.butlermanager.data.TimeEntryDatabase
 import com.example.butlermanager.data.TimeSlot
-import java.lang.Exception
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,6 +39,8 @@ class EspressifManager(context: Context) {
     var timeServer: String? = "iothub.local"
     var mqttBroker: String? = "iothub.local"
     var otaHost: String? = "iothub.local"
+    var timeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
+    var initialTimeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
 
 
     suspend fun connect(qrData: QrData) {
@@ -194,13 +198,16 @@ class EspressifManager(context: Context) {
 
         return suspendCancellableCoroutine { continuation ->
             device.sendDataToCustomEndPoint("cronRd", byteArrayOf(0, 24, 0, 0), object : ResponseListener {
-                override fun onSuccess(response: ByteArray) {
-                    Log.d(TAG, "Custom data received: ${response.contentToString()}")
+                override fun onSuccess(response: ByteArray?) {
+                    Log.d(TAG, "Custom data received: ${response?.contentToString()}")
                     scope.launch {
                         try {
                             if (continuation.isActive) {
-                                val timeSlots = parseCronData(dn, response)
-                                timeEntryDao.updateTimeSlotsForConfiguration(dn, timeSlots)
+                                response?.let {
+                                    val parsedTimeSlots = parseCronData(dn, it)
+                                    timeSlots = parsedTimeSlots
+                                    timeEntryDao.updateTimeSlotsForConfiguration(dn, parsedTimeSlots)
+                                }
                                 continuation.resume(Unit)
                             }
                         } catch (e: Exception) {
@@ -224,15 +231,11 @@ class EspressifManager(context: Context) {
 
     suspend fun writeCronData() {
         val device = espDevice ?: throw IllegalStateException("Device not connected")
-        val dn = deviceName ?: throw IllegalStateException("Device name not set")
-
-        val configWithTimeSlots = timeEntryDao.getConfigurationWithTimeSlots(dn)
-        val timeSlots = configWithTimeSlots?.timeSlots ?: emptyList()
         val cronData = packCronData(timeSlots)
 
         return suspendCancellableCoroutine { continuation ->
             device.sendDataToCustomEndPoint("cronWr", cronData, object : ResponseListener {
-                override fun onSuccess(response: ByteArray) {
+                override fun onSuccess(response: ByteArray?) {
                     Log.d(TAG, "Successfully wrote cron data")
                     if (continuation.isActive) {
                         continuation.resume(Unit)
@@ -250,6 +253,7 @@ class EspressifManager(context: Context) {
     }
 
     suspend fun writeTimeData() {
+        /* Writes current time */
         val device = espDevice ?: throw IllegalStateException("Device not connected")
 
         val sdf = SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy", Locale.ENGLISH)
@@ -259,7 +263,7 @@ class EspressifManager(context: Context) {
 
         return suspendCancellableCoroutine { continuation ->
             device.sendDataToCustomEndPoint("timeWr", timeData, object : ResponseListener {
-                override fun onSuccess(response: ByteArray) {
+                override fun onSuccess(response: ByteArray?) {
                     Log.d(TAG, "Successfully wrote time data")
                     if (continuation.isActive) {
                         continuation.resume(Unit)
@@ -268,6 +272,34 @@ class EspressifManager(context: Context) {
 
                 override fun onFailure(e: Exception) {
                     Log.e(TAG, "Failed to write time data", e)
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(e)
+                    }
+                }
+            })
+        }
+    }
+
+    suspend fun writeAdvancedConfigs() {
+        val device = espDevice ?: throw IllegalStateException("Device not connected")
+
+        val timeServerBytes = (timeServer ?: "").toByteArray(Charsets.UTF_8) + 0.toByte()
+        val mqttBrokerBytes = (mqttBroker ?: "").toByteArray(Charsets.UTF_8) + 0.toByte()
+        val otaHostBytes = (otaHost ?: "").toByteArray(Charsets.UTF_8) + 0.toByte()
+
+        val data = timeServerBytes + mqttBrokerBytes + otaHostBytes
+
+        return suspendCancellableCoroutine { continuation ->
+            device.sendDataToCustomEndPoint("bcfgWr", data, object : ResponseListener {
+                override fun onSuccess(response: ByteArray?) {
+                    Log.d(TAG, "Successfully wrote advanced configs")
+                    if (continuation.isActive) {
+                        continuation.resume(Unit)
+                    }
+                }
+
+                override fun onFailure(e: Exception) {
+                    Log.e(TAG, "Failed to write advanced configs", e)
                     if (continuation.isActive) {
                         continuation.resumeWithException(e)
                     }

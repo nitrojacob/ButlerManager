@@ -12,9 +12,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.butlermanager.ui.AdvancedConfigScreen
@@ -30,10 +37,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val espressifManager = EspressifManager(applicationContext)
         setContent {
             ButlerManagerTheme {
-                AppNavigation(espressifManager)
+                AppNavigation()
             }
         }
     }
@@ -42,8 +48,19 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavigation(espressifManager: EspressifManager) {
+fun AppNavigation() {
     val navController = rememberNavController()
+    val context = LocalContext.current.applicationContext
+    var espressifManager: EspressifManager? by remember { mutableStateOf(null) }
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(navBackStackEntry) {
+        if (navBackStackEntry?.destination?.route == "qrScanner") {
+            espressifManager?.disconnect()
+            espressifManager = null
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -71,11 +88,18 @@ fun AppNavigation(espressifManager: EspressifManager) {
                     navArgument("name") { defaultValue = "" },
                 )
             ) { backStackEntry ->
-                TimeEntryScreenOfDevice(
-                    navController = navController,
-                    name = backStackEntry.arguments?.getString("name") ?: "",
-                    espressifManager = espressifManager,
-                )
+                LaunchedEffect(Unit) {
+                    if (espressifManager == null) {
+                        espressifManager = EspressifManager(context)
+                    }
+                }
+                espressifManager?.let { manager ->
+                    TimeEntryScreenOfDevice(
+                        navController = navController,
+                        name = backStackEntry.arguments?.getString("name") ?: "",
+                        espressifManager = manager,
+                    )
+                }
             }
             composable(
                 route = "timeEntryConfig/{name}",
@@ -92,11 +116,13 @@ fun AppNavigation(espressifManager: EspressifManager) {
                 route = "advanced_config/{name}",
                 arguments = listOf(navArgument("name") { defaultValue = "" })
             ) { backStackEntry ->
-                AdvancedConfigScreen(
-                    navController = navController,
-                    name = backStackEntry.arguments?.getString("name") ?: "",
-                    espressifManager = espressifManager
-                )
+                espressifManager?.let { manager ->
+                    AdvancedConfigScreen(
+                        navController = navController,
+                        name = backStackEntry.arguments?.getString("name") ?: "",
+                        espressifManager = manager
+                    )
+                }
             }
             composable("savedConfigs") {
                 SavedConfigsScreen(navController)
@@ -107,11 +133,18 @@ fun AppNavigation(espressifManager: EspressifManager) {
                     navArgument("qrDataJson") { defaultValue = "" }
                 )
             ) { backStackEntry ->
-                ConnectProgressScreen(
-                    navController = navController,
-                    qrDataJson = backStackEntry.arguments?.getString("qrDataJson") ?: "",
-                    espressifManager = espressifManager
-                )
+                LaunchedEffect(Unit) {
+                    if (espressifManager == null) {
+                        espressifManager = EspressifManager(context)
+                    }
+                }
+                espressifManager?.let { manager ->
+                    ConnectProgressScreen(
+                        navController = navController,
+                        qrDataJson = backStackEntry.arguments?.getString("qrDataJson") ?: "",
+                        espressifManager = manager
+                    )
+                }
             }
         }
     }
