@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -102,6 +103,13 @@ fun QrScannerScreen(navController: NavController) {
     ) {
         if (hasCameraPermission) {
             Log.d(TAG, "Camera permission is granted, showing camera preview.")
+            
+            Text(
+                text = "Scan a device QR code to connect",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
             Box(
                 modifier = Modifier
                     .size(240.dp, 240.dp)
