@@ -313,15 +313,15 @@ class EspressifManager(context: Context) {
         for (timeSlot in timeSlots) {
             byteList.add(timeSlot.minute.toByte())
             byteList.add(timeSlot.hour.toByte())
-            byteList.add(timeSlot.channel.toByte())
             byteList.add(timeSlot.onOff.toByte())
+            byteList.add(timeSlot.channel.toByte())
         }
         return byteList.toByteArray()
     }
 
     private fun parseCronData(deviceName: String, data: ByteArray): List<TimeSlot> {
         val timeSlots = mutableListOf<TimeSlot>()
-        val chunkSize = 4 // hour, minute, channel, onOff
+        val chunkSize = 4 // hour, minute, onOff, channel
         data.asList().chunked(chunkSize).forEachIndexed { index, chunk ->
             if (chunk.size == chunkSize) {
                 val timeSlot = TimeSlot(
@@ -329,8 +329,8 @@ class EspressifManager(context: Context) {
                     rowIndex = index,
                     minute = chunk[0].toUByte().toInt(),
                     hour = chunk[1].toUByte().toInt(),
-                    channel = chunk[2].toUByte().toInt(),
-                    onOff = chunk[3].toUByte().toInt(),
+                    onOff = chunk[2].toUByte().toInt(),
+                    channel = chunk[3].toUByte().toInt(),
                 )
                 Log.d(TAG, "Parsed TimeSlot: $timeSlot")
                 timeSlots.add(timeSlot)

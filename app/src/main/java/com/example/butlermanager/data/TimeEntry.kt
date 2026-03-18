@@ -17,8 +17,8 @@ data class TimeSlot(
     val rowIndex: Int,
     val hour: Int,
     val minute: Int,
-    val channel: Int,
-    val onOff: Int
+    val onOff: Int,
+    val channel: Int
 )
 
 data class ConfigurationWithTimeSlots(

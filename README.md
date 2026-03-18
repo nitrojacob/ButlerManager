@@ -29,3 +29,6 @@ The app is built around the assumption that the device exposes following custom 
 
 ## Tests
 The app was tested against an ESP8266 board running provisioning library.
+
+## Documentation
+AI generated documentation of the Espressif provisioning library on the android side is available in the docs folder **[ESP Provisioning Library for Android](docs/index.md)**

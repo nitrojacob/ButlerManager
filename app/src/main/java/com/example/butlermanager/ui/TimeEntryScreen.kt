@@ -90,10 +90,10 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                                                     ) ?: TimeSlot(
                                                         configurationName = name,
                                                         rowIndex = index,
-                                                        channel = 0,
+                                                        onOff = 0,
                                                         hour = 24,
                                                         minute = 0,
-                                                        onOff = 0
+                                                        channel = 0
                                                     )
                                                 }
                                             }
@@ -141,10 +141,10 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                         existingTimeSlots.find { it.rowIndex == index } ?: TimeSlot(
                             configurationName = name,
                             rowIndex = index,
-                            channel = 0,
+                            onOff = 0,
                             hour = 24,
                             minute = 0,
-                            onOff = 0
+                            channel = 0
                         )
                     }
                 } else {
@@ -152,10 +152,10 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                         TimeSlot(
                             configurationName = name,
                             rowIndex = it,
-                            channel = 0,
+                            onOff = 0,
                             hour = 24,
                             minute = 0,
-                            onOff = 0
+                            channel = 0
                         )
                     }
                 }
@@ -242,14 +242,14 @@ fun TimeEntryScreenOfConfig(navController: NavController, name: String) {
                     existingTimeSlots.find { it.rowIndex == index } ?: TimeSlot(
                         configurationName = name,
                         rowIndex = index,
-                        channel = 0,
+                        onOff = 0,
                         hour = 24,
                         minute = 0,
-                        onOff = 0
+                        channel = 0
                     )
                 }
             } else {
-                List(15) { TimeSlot(configurationName = name, rowIndex = it, channel = 0, hour = 24, minute = 0, onOff = 0) }
+                List(15) { TimeSlot(configurationName = name, rowIndex = it, onOff = 0, hour = 24, minute = 0, channel = 0) }
             }
             timeSlots = loadedTimeSlots
             initialTimeSlots = loadedTimeSlots
@@ -332,22 +332,10 @@ private fun TimeEntryList(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         OutlinedTextField(
-                            value = timeSlot.channel.toString(),
-                            onValueChange = { newChannel ->
-                                val updatedTimeSlots = timeSlots.toMutableList()
-                                updatedTimeSlots[index] = timeSlot.copy(channel = newChannel.filter { it.isDigit() }.take(2).toIntOrNull() ?: 0)
-                                onTimeSlotsChanged(updatedTimeSlots)
-                            },
-                            label = { Text("Ch") },
-                            modifier = Modifier.width(80.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        OutlinedTextField(
                             value = timeSlot.onOff.toString(),
                             onValueChange = { newOnOff ->
                                 val updatedTimeSlots = timeSlots.toMutableList()
-                                updatedTimeSlots[index] = timeSlot.copy(onOff = newOnOff.filter { it.isDigit() }.take(1).toIntOrNull() ?: 0)
+                                updatedTimeSlots[index] = timeSlot.copy(onOff = newOnOff.filter { it.isDigit() }.take(2).toIntOrNull() ?: 0)
                                 onTimeSlotsChanged(updatedTimeSlots)
                             },
                             label = { Text("On/Off") },
@@ -355,9 +343,21 @@ private fun TimeEntryList(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = timeSlot.channel.toString(),
+                            onValueChange = { newChannel ->
+                                val updatedTimeSlots = timeSlots.toMutableList()
+                                updatedTimeSlots[index] = timeSlot.copy(channel = newChannel.filter { it.isDigit() }.take(1).toIntOrNull() ?: 0)
+                                onTimeSlotsChanged(updatedTimeSlots)
+                            },
+                            label = { Text("Ch") },
+                            modifier = Modifier.width(80.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         IconButton(onClick = {
                             val updatedTimeSlots = timeSlots.toMutableList()
-                            updatedTimeSlots[index] = timeSlot.copy(hour = 24, minute = 0, channel = 0, onOff = 0)
+                            updatedTimeSlots[index] = timeSlot.copy(hour = 24, minute = 0, onOff = 0, channel = 0)
                             onTimeSlotsChanged(updatedTimeSlots)
                         }) {
                             Icon(Icons.Filled.Delete, contentDescription = "Delete")
@@ -372,7 +372,7 @@ private fun TimeEntryList(
                 val firstEmptyIndex = timeSlots.indexOfFirst { it.hour >= 24 }
                 if (firstEmptyIndex != -1) {
                     val updatedTimeSlots = timeSlots.toMutableList()
-                    updatedTimeSlots[firstEmptyIndex] = timeSlots[firstEmptyIndex].copy(hour = 0, minute = 0, channel = 0, onOff = 0)
+                    updatedTimeSlots[firstEmptyIndex] = timeSlots[firstEmptyIndex].copy(hour = 0, minute = 0, onOff = 0, channel = 0)
                     onTimeSlotsChanged(updatedTimeSlots)
                 }
             },
