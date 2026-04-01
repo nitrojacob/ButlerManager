@@ -14,6 +14,8 @@ import com.espressif.provisioning.listeners.ResponseListener
 import com.example.butlermanager.data.QrData
 import com.example.butlermanager.data.TimeEntryDatabase
 import com.example.butlermanager.data.TimeSlot
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,6 +35,7 @@ class EspressifManager(context: Context) {
     private var espDevice: ESPDevice? = null
     private val timeEntryDao = TimeEntryDatabase.getDatabase(context).timeEntryDao()
     private var deviceName: String? = null
+    private var mac: String? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     var ssid: String ?= ""
     var password: String?= ""
@@ -42,6 +45,10 @@ class EspressifManager(context: Context) {
     var timeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
     var initialTimeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
 
+    private fun getName(): String {
+        val mac = mac ?: ""
+        return "butler${mac.replace("_", "")}0000/"
+    }
 
     suspend fun connect(qrData: QrData) {
         val transport = qrData.transport ?: "softap" // Default to softap
@@ -69,6 +76,7 @@ class EspressifManager(context: Context) {
         val device = provisionManager.createESPDevice(transportType, securityType)
         espDevice = device
         deviceName = qrData.name
+        mac = qrData.password
 
         device.proofOfPossession = qrData.pop ?: ""
         device.deviceName = qrData.name ?: ""
@@ -193,11 +201,10 @@ class EspressifManager(context: Context) {
     }
 
     suspend fun readCronData() {
-        val device = espDevice ?: throw IllegalStateException("Device not connected")
         val dn = deviceName ?: throw IllegalStateException("Device name not set")
 
         return suspendCancellableCoroutine { continuation ->
-            device.sendDataToCustomEndPoint("cronRd", byteArrayOf(0, 24, 0, 0), object : ResponseListener {
+            sendStateProbeOverProv ("nvCron/rd", byteArrayOf(0, 24, 0, 0), object : ResponseListener {
                 override fun onSuccess(response: ByteArray?) {
                     Log.d(TAG, "Custom data received: ${response?.contentToString()}")
                     scope.launch {
@@ -229,12 +236,69 @@ class EspressifManager(context: Context) {
         }
     }
 
+    private suspend fun readPLogLine(): String? {
+        return suspendCancellableCoroutine { continuation ->
+            sendStateProbeOverProv("plogRd", byteArrayOf(0, 0, 0, 0), object : ResponseListener {
+                override fun onSuccess(response: ByteArray?) {
+                    if (continuation.isActive) {
+                        val line = response?.toString(Charsets.UTF_8)?.trimEnd('\u0000')
+                        continuation.resume(line)
+                    }
+                }
+
+                override fun onFailure(e: Exception) {
+                    Log.e(TAG, "Failed to read PLog line", e)
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(e)
+                    }
+                }
+            })
+        }
+    }
+
+    suspend fun readPLog(): String {
+        val lines = mutableListOf<String>()
+        var firstLine: String? = null
+
+        while (true) {
+            val line = readPLogLine() ?: break
+            if (line.isEmpty()) break
+
+            if (firstLine == null) {
+                firstLine = line
+            } else if (line == firstLine) {
+                break
+            }
+            lines.add(line)
+            
+            if (lines.size > 1000) break 
+        }
+
+        if (lines.isEmpty()) return ""
+
+        val dashIndex = lines.indexOf("-")
+        if (dashIndex == -1) {
+            return lines.joinToString("\n")
+        }
+
+        // Circular buffer reordering logic:
+        // Entry before "-" is head (newest), entry after "-" is tail (oldest).
+        // lines: [0, 1, ..., dashIndex-1, "-", dashIndex+1, ..., last]
+        // Order: [dashIndex+1, ..., last, 0, 1, ..., dashIndex-1]
+        
+        val oldestPart = lines.subList(dashIndex + 1, lines.size)
+        val newestPart = lines.subList(0, dashIndex)
+        
+        val reorderedLines = oldestPart + newestPart
+        
+        return reorderedLines.filter { it != "-" && it.isNotBlank() }.joinToString("\n")
+    }
+
     suspend fun writeCronData() {
-        val device = espDevice ?: throw IllegalStateException("Device not connected")
         val cronData = packCronData(timeSlots)
 
         return suspendCancellableCoroutine { continuation ->
-            device.sendDataToCustomEndPoint("cronWr", cronData, object : ResponseListener {
+            sendStateProbeOverProv("nvCron/wr", cronData, object : ResponseListener {
                 override fun onSuccess(response: ByteArray?) {
                     Log.d(TAG, "Successfully wrote cron data")
                     if (continuation.isActive) {
@@ -254,30 +318,55 @@ class EspressifManager(context: Context) {
 
     suspend fun writeTimeData() {
         /* Writes current time */
-        val device = espDevice ?: throw IllegalStateException("Device not connected")
-
         val sdf = SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy", Locale.ENGLISH)
         val currentTime = sdf.format(Date())
-
         val timeData = currentTime.toByteArray(Charsets.US_ASCII)
 
         return suspendCancellableCoroutine { continuation ->
-            device.sendDataToCustomEndPoint("timeWr", timeData, object : ResponseListener {
+            sendStateProbeOverProv("time/set", timeData, object : ResponseListener {
                 override fun onSuccess(response: ByteArray?) {
-                    Log.d(TAG, "Successfully wrote time data")
+                    Log.d(TAG, "Successfully wrote current time")
                     if (continuation.isActive) {
                         continuation.resume(Unit)
                     }
                 }
 
                 override fun onFailure(e: Exception) {
-                    Log.e(TAG, "Failed to write time data", e)
+                    Log.e(TAG, "Failed to write current time", e)
                     if (continuation.isActive) {
                         continuation.resumeWithException(e)
                     }
                 }
             })
         }
+    }
+
+    private fun sendStateProbeOverProv(topicSuffix: String, data: ByteArray, listener: ResponseListener) {
+        val device = espDevice ?: throw IllegalStateException("Device not connected")
+        val topic = getName() + topicSuffix
+        val probeData = packStateProbeProvContext(topic, data)
+        device.sendDataToCustomEndPoint("sProbe", probeData, listener)
+    }
+
+    private fun packStateProbeProvContext(topic: String, data: ByteArray): ByteArray {
+        val mqttTopicLenMax = 54
+        val probeProvDataMaxLen = 256
+
+        val topicBytes = topic.toByteArray(Charsets.UTF_8)
+        val topicFixed = ByteArray(mqttTopicLenMax)
+        System.arraycopy(topicBytes, 0, topicFixed, 0, minOf(topicBytes.size, mqttTopicLenMax))
+
+        val dataLen = data.size.toShort()
+        val dataFixed = ByteArray(probeProvDataMaxLen)
+        System.arraycopy(data, 0, dataFixed, 0, minOf(data.size, probeProvDataMaxLen))
+
+        val buffer = ByteBuffer.allocate(mqttTopicLenMax + 2 + probeProvDataMaxLen)
+        buffer.order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put(topicFixed)
+        buffer.putShort(dataLen)
+        buffer.put(dataFixed)
+
+        return buffer.array()
     }
 
     suspend fun writeAdvancedConfigs() {

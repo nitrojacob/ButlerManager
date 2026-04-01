@@ -123,7 +123,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
     DisposableEffect(navController) {
         onDispose {
             val destinationRoute = navController.currentBackStackEntry?.destination?.route
-            if (destinationRoute?.startsWith("advanced_config/") != true) {
+            if (destinationRoute?.startsWith("advanced_config/") != true && destinationRoute != "log_viewer") {
                 scope.launch {
                     espressifManager.disconnect()
                 }
@@ -399,16 +399,25 @@ private fun ConnectProgressButtons(
         ) {
             Text("Import")
         }
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(4.dp))
         Button(
             onClick = {
                 navController.navigate("advanced_config/$name")
             },
             enabled = !isProvisioning
         ) {
-            Text("Advanced")
+            Text("Adv")
         }
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(4.dp))
+        Button(
+            onClick = {
+                navController.navigate("log_viewer")
+            },
+            enabled = !isProvisioning
+        ) {
+            Text("Logs")
+        }
+        Spacer(modifier = Modifier.width(4.dp))
         Button(
             onClick = onUpdate,
             enabled = isFormDirty && !isProvisioning

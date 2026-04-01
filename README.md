@@ -1,5 +1,5 @@
-# espManager
-Android app to manage a fleet of esp devices. Users can either manage/configure the devices locally or can provision them to connect to an iot broker. We use the espressif provisioning library. This can be used as a modern Kotlin alternative to the Espressif's Java App 'ESP SoftAP Prov'
+# Butler Manager
+Android app to manage a fleet of esp devices. Users can either manage/configure the devices locally or can provision them to connect to an iot broker. We use the espressif provisioning library. This can be used as a modern Kotlin alternative to the Espressif's Java App 'ESP SoftAP Prov'. The device side firmware is [in my other repository](https://github.com/nitrojacob/Butler)  
 
 
 ## App Screenshots

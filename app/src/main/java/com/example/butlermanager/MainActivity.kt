@@ -27,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.butlermanager.ui.AdvancedConfigScreen
 import com.example.butlermanager.ui.ConnectProgressScreen
+import com.example.butlermanager.ui.LogViewerScreen
 import com.example.butlermanager.ui.NearbyDevicesScreen
 import com.example.butlermanager.ui.QrScannerScreen
 import com.example.butlermanager.ui.SavedConfigsScreen
@@ -56,7 +57,8 @@ fun AppNavigation() {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     LaunchedEffect(navBackStackEntry) {
-        if (navBackStackEntry?.destination?.route == "qrScanner") {
+        val route = navBackStackEntry?.destination?.route
+        if (route == "qrScanner") {
             espressifManager?.disconnect()
             espressifManager = null
         }
@@ -123,6 +125,11 @@ fun AppNavigation() {
                         name = backStackEntry.arguments?.getString("name") ?: "",
                         espressifManager = manager
                     )
+                }
+            }
+            composable("log_viewer") {
+                espressifManager?.let { manager ->
+                    LogViewerScreen(navController = navController, espressifManager = manager)
                 }
             }
             composable("savedConfigs") {
