@@ -47,7 +47,7 @@ class EspressifManager(context: Context) {
 
     private fun getName(): String {
         val mac = mac ?: ""
-        return "butler${mac.replace("_", "")}0000/"
+        return "BUTLER_${mac}/"
     }
 
     suspend fun connect(qrData: QrData) {

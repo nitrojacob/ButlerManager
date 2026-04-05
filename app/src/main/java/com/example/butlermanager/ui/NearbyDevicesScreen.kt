@@ -19,6 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -216,59 +218,89 @@ fun NearbyDevicesScreen(navController: NavController) {
         }
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        when {
-            !hasPermission -> {
-                Text("Location permission is required to show nearby devices.")
-            }
-            !isLocationServicesEnabled -> {
-                Text("Location services are disabled. Please enable them to scan for nearby devices.")
-            }
-            else -> {
-                val butlerScanResults = scanResults.filter { getSsid(it).startsWith("BUTLER_") }
-                if (butlerScanResults.isEmpty()) {
-                    Text("Scanning for nearby devices...")
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(butlerScanResults) { result ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            val ssid = getSsid(result)
-                                            val qrData = db
-                                                .qrDataDao()
-                                                .getQrDataByName(ssid)
-                                            if (qrData != null) {
-                                                val qrDataJson = Gson().toJson(qrData)
-                                                val encodedQrData = URLEncoder.encode(
-                                                    qrDataJson,
-                                                    StandardCharsets.UTF_8.toString()
-                                                )
-                                                navController.navigate("connectProgress/$encodedQrData")
-                                            } else {
-                                                showDeviceNotKnownDialog = true
-                                            }
-                                        }
-                                    }
-                            ) {
-                                Row(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            when {
+                !hasPermission -> {
+                    Text("Location permission is required to show nearby devices.")
+                }
+                !isLocationServicesEnabled -> {
+                    Text("Location services are disabled. Please enable them to scan for nearby devices.")
+                }
+                else -> {
+                    val butlerScanResults = scanResults.filter { getSsid(it).startsWith("BUTLER_") }
+                    if (butlerScanResults.isEmpty()) {
+                        Text("Scanning for nearby devices...")
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(butlerScanResults) { result ->
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .clickable {
+                                            coroutineScope.launch {
+                                                val ssid = getSsid(result)
+                                                val qrData = db
+                                                    .qrDataDao()
+                                                    .getQrDataByName(ssid)
+                                                if (qrData != null) {
+                                                    val qrDataJson = Gson().toJson(qrData)
+                                                    val encodedQrData = URLEncoder.encode(
+                                                        qrDataJson,
+                                                        StandardCharsets.UTF_8.toString()
+                                                    )
+                                                    navController.navigate("connectProgress/$encodedQrData")
+                                                } else {
+                                                    showDeviceNotKnownDialog = true
+                                                }
+                                            }
+                                        }
                                 ) {
-                                    Column {
-                                        Text(text = getSsid(result))
-                                        Text(text = "${result.level} dBm")
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(text = getSsid(result))
+                                            Text(text = "${result.level} dBm")
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.padding(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { navController.navigate("qrScanner") },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Scan QR code")
+            }
+
+            Button(
+                onClick = { navController.navigate("savedConfigs") },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Saved Configs")
             }
         }
     }

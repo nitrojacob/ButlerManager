@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,7 +62,7 @@ fun QrScannerScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
 
     BackHandler {
-        (context as? ComponentActivity)?.finish()
+        navController.popBackStack()
     }
 
     val cameraProviderFuture = remember {
@@ -204,18 +203,6 @@ fun QrScannerScreen(navController: NavController) {
             }
         } else {
             Text("Camera permission is required to scan QR codes.")
-        }
-        Button(
-            onClick = { navController.navigate("savedConfigs") },
-            modifier = Modifier.padding(top = 32.dp)
-        ) {
-            Text("Saved Configs")
-        }
-        Button(
-            onClick = { navController.navigate("nearbyDevices") },
-            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
-        ) {
-            Text("Nearby Devices")
         }
     }
 

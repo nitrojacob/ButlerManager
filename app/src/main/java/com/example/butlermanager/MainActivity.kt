@@ -76,7 +76,7 @@ fun AppNavigation() {
         }
     ) { paddingValues ->
         NavHost(
-            navController = navController, startDestination = "qrScanner",
+            navController = navController, startDestination = "nearbyDevices",
             modifier = Modifier.padding(paddingValues)
         ) {
             composable("qrScanner") {
