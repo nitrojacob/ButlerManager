@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.provider.Settings
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +51,7 @@ import com.example.butlermanager.data.QrData
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 private const val TAG = "ConnectProgressScreen"
@@ -92,6 +94,36 @@ fun rememberProvisioningSteps(): List<ProvisioningStep> {
 fun ConnectProgressScreen(
     navController: NavController, qrDataJson: String, espressifManager: EspressifManager
 ) {
+    BackHandler {
+        espressifManager.disconnect()
+        navController.popBackStack()
+    }
+
+    val isDone = qrDataJson == "done"
+    val previousRoute = remember { navController.previousBackStackEntry?.destination?.route }
+    val isFromProvisioningSource = previousRoute == "qrScanner" || previousRoute == "nearbyDevices"
+
+    if (isDone || !isFromProvisioningSource) {
+        LaunchedEffect(Unit) {
+            delay(1000)
+            navController.popBackStack()
+        }
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = stringResource(R.string.success),
+                modifier = Modifier.size(120.dp),
+                tint = Color(0xFF00C853)
+            )
+        }
+        return
+    }
+
     val qrData = remember(qrDataJson) {
         try {
             Gson().fromJson(qrDataJson, QrData::class.java)
@@ -110,9 +142,6 @@ fun ConnectProgressScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(stringResource(R.string.error_invalid_qr_code_data))
-            Button(onClick = { navController.popBackStack() }) {
-                Text(stringResource(R.string.back_to_scanner))
-            }
         }
         return
     }
@@ -120,7 +149,6 @@ fun ConnectProgressScreen(
     Log.d(TAG, "Attempting to connect to device: ${qrData.name}")
     val context = LocalContext.current
     var overallStatus by remember { mutableStateOf(context.getString(R.string.connecting)) }
-    var showBackButton by remember { mutableStateOf(false) }
 
     val steps = rememberProvisioningSteps()
     var showWifiDialog by remember { mutableStateOf(false) }
@@ -174,7 +202,6 @@ fun ConnectProgressScreen(
             if (!hasPermissions) {
                 Log.w(TAG, "Permissions not granted")
                 overallStatus = context.getString(R.string.permission_denied_messsage)
-                showBackButton = true
             } else {
                 Log.d(TAG, "Permissions granted")
             }
@@ -219,7 +246,7 @@ fun ConnectProgressScreen(
 
                 overallStatus = context.getString(R.string.connected_successfully)
                 navController.navigate("timeEntryDevice/${qrData.name ?: ""}") {
-                    popUpTo("qrScanner") { inclusive = true }
+                    navController.popBackStack()
                 }
             } catch (e: Throwable) {
                 val errorMessage = when (e) {
@@ -239,7 +266,6 @@ fun ConnectProgressScreen(
                 }
 
                 overallStatus = context.getString(R.string.failed_to_connect_to_device)
-                showBackButton = true
             }
         }
     }
@@ -255,7 +281,10 @@ fun ConnectProgressScreen(
                 }
             },
             dismissButton = {
-                Button(onClick = { navController.popBackStack() }) {
+                Button(onClick = {
+                    espressifManager.disconnect()
+                    navController.popBackStack()
+                }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
@@ -311,15 +340,6 @@ fun ConnectProgressScreen(
                         }
                     }
                 }
-            }
-        }
-
-        if (showBackButton) {
-            Button(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text(stringResource(R.string.back_to_scanner))
             }
         }
     }

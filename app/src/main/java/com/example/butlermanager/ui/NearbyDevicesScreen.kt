@@ -213,7 +213,7 @@ fun NearbyDevicesScreen(navController: NavController) {
         if (hasPermission && isLocationServicesEnabled) {
             while (true) {
                 startScan()
-                delay(15000) // Scan every 15 seconds
+                delay(5000) // Scan every 5 seconds
             }
         }
     }

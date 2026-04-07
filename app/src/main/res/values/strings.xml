@@ -7,7 +7,6 @@
     <string name="connect_progress_step4">Writing Time Data</string>
     <string name="connect_progress_step5">Reading Cron Data</string>
     <string name="error_invalid_qr_code_data">Error: Invalid QR Code data.</string>
-    <string name="back_to_scanner">Back to Scanner</string>
     <string name="connecting">Connecting...</string>
     <string name="permission_denied_messsage">Permission denied. Cannot connect to device.</string>
     <string name="wifi_disabled_message">Wi-Fi is disabled. Please enable it to continue.</string>

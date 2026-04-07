@@ -59,7 +59,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
     var allConfigs by remember { mutableStateOf<List<TimeEntryConfiguration>>(emptyList()) }
 
     BackHandler {
-        navController.navigate("qrScanner")
+        navController.popBackStack()
     }
 
     if (showImportDialog) {
@@ -204,7 +204,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                     espressifManager.initialTimeSlots = espressifManager.timeSlots
                     advancedSettingsChanged = false
                     isProvisioning = false
-                    navController.navigate("qrScanner")
+                    navController.popBackStack()
                 }
             },
             onImport = {

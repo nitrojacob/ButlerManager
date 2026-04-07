@@ -132,8 +132,8 @@ class EspressifManager(context: Context) {
     }
 
     fun disconnect() {
-        val device = espDevice ?: throw IllegalStateException("Device not connected")
-        device.disconnectDevice()
+        espDevice?.disconnectDevice()
+        espDevice = null
     }
 
 
