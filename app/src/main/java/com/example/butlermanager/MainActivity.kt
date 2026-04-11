@@ -29,6 +29,7 @@ import com.example.butlermanager.ui.AdvancedConfigScreen
 import com.example.butlermanager.ui.ConnectProgressScreen
 import com.example.butlermanager.ui.LogViewerScreen
 import com.example.butlermanager.ui.NearbyDevicesScreen
+import com.example.butlermanager.ui.NetworkModeHomeScreen
 import com.example.butlermanager.ui.QrScannerScreen
 import com.example.butlermanager.ui.SavedConfigsScreen
 import com.example.butlermanager.ui.TimeEntryScreenOfConfig
@@ -53,14 +54,15 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation() {
     val navController = rememberNavController()
     val context = LocalContext.current.applicationContext
-    var espressifManager: EspressifManager? by remember { mutableStateOf(null) }
+    var currentDeviceManager: DeviceManager? by remember { mutableStateOf(null) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     LaunchedEffect(navBackStackEntry) {
         val route = navBackStackEntry?.destination?.route
-        if (route == "qrScanner") {
-            espressifManager?.disconnect()
-            espressifManager = null
+        // Clear manager when returning to root navigation screens
+        if (route == "qrScanner" || route == "nearbyDevices" || route == "savedConfigs") {
+            currentDeviceManager?.disconnect()
+            currentDeviceManager = null
         }
     }
 
@@ -85,22 +87,28 @@ fun AppNavigation() {
             composable("nearbyDevices") {
                 NearbyDevicesScreen(navController)
             }
+            composable("networkModeHome") {
+                LaunchedEffect(Unit) {
+                    if (currentDeviceManager !is MqttManager) {
+                        currentDeviceManager?.disconnect()
+                        currentDeviceManager = MqttManager(context)
+                    }
+                }
+                (currentDeviceManager as? MqttManager)?.let { mqttManager ->
+                    NetworkModeHomeScreen(navController, mqttManager)
+                }
+            }
             composable(
                 route = "timeEntryDevice/{name}",
                 arguments = listOf(
                     navArgument("name") { defaultValue = "" },
                 )
             ) { backStackEntry ->
-                LaunchedEffect(Unit) {
-                    if (espressifManager == null) {
-                        espressifManager = EspressifManager(context)
-                    }
-                }
-                espressifManager?.let { manager ->
+                currentDeviceManager?.let { manager ->
                     TimeEntryScreenOfDevice(
                         navController = navController,
                         name = backStackEntry.arguments?.getString("name") ?: "",
-                        espressifManager = manager,
+                        deviceManager = manager,
                     )
                 }
             }
@@ -119,7 +127,7 @@ fun AppNavigation() {
                 route = "advanced_config/{name}",
                 arguments = listOf(navArgument("name") { defaultValue = "" })
             ) { backStackEntry ->
-                espressifManager?.let { manager ->
+                (currentDeviceManager as? EspressifManager)?.let { manager ->
                     AdvancedConfigScreen(
                         navController = navController,
                         name = backStackEntry.arguments?.getString("name") ?: "",
@@ -128,8 +136,8 @@ fun AppNavigation() {
                 }
             }
             composable("log_viewer") {
-                espressifManager?.let { manager ->
-                    LogViewerScreen(navController = navController, espressifManager = manager)
+                currentDeviceManager?.let { manager ->
+                    LogViewerScreen(navController = navController, deviceManager = manager)
                 }
             }
             composable("savedConfigs") {
@@ -142,15 +150,16 @@ fun AppNavigation() {
                 )
             ) { backStackEntry ->
                 LaunchedEffect(Unit) {
-                    if (espressifManager == null) {
-                        espressifManager = EspressifManager(context)
+                    if (currentDeviceManager !is EspressifManager) {
+                        currentDeviceManager?.disconnect()
+                        currentDeviceManager = EspressifManager(context)
                     }
                 }
-                espressifManager?.let { manager ->
+                (currentDeviceManager as? EspressifManager)?.let { espressifManager ->
                     ConnectProgressScreen(
                         navController = navController,
                         qrDataJson = backStackEntry.arguments?.getString("qrDataJson") ?: "",
-                        espressifManager = manager
+                        deviceManager = espressifManager
                     )
                 }
             }

@@ -16,6 +16,9 @@ material-icons = "1.6.3"
 mlkit-barcode-scanning = "17.2.0"
 navigation-compose = "2.7.7"
 room = "2.6.1"
+paho-mqtt = "1.1.1"
+paho-android = "1.1.1"
+localbroadcastmanager = "1.1.0"
 
 [libraries]
 
@@ -44,6 +47,9 @@ mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 esp-idf-provisioning = { module = "com.github.espressif:esp-idf-provisioning-android", version.ref = "esp-idf-provisioning" }
 eventbus = { module = "org.greenrobot:eventbus", version.ref = "eventbus" }
+paho-mqtt = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "paho-mqtt" }
+paho-android = { module = "org.eclipse.paho:org.eclipse.paho.android.service", version.ref = "paho-android" }
+localbroadcastmanager = { module = "androidx.localbroadcastmanager:localbroadcastmanager", version.ref = "localbroadcastmanager" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }

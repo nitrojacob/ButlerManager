@@ -30,27 +30,27 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 
-class EspressifManager(context: Context) {
+class EspressifManager(context: Context) : DeviceManager {
     private val provisionManager: ESPProvisionManager = ESPProvisionManager.getInstance(context.applicationContext)
     private var espDevice: ESPDevice? = null
     private val timeEntryDao = TimeEntryDatabase.getDatabase(context).timeEntryDao()
     private var deviceName: String? = null
     private var mac: String? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    var ssid: String ?= ""
-    var password: String?= ""
-    var timeServer: String? = "iothub.local"
-    var mqttBroker: String? = "iothub.local"
-    var otaHost: String? = "iothub.local"
-    var timeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
-    var initialTimeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
+    override var ssid: String ?= ""
+    override var password: String?= ""
+    override var timeServer: String? = "iothub.local"
+    override var mqttBroker: String? = "iothub.local"
+    override var otaHost: String? = "iothub.local"
+    override var timeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
+    override var initialTimeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
 
     private fun getName(): String {
         val mac = mac ?: ""
         return "BUTLER_${mac}/"
     }
 
-    suspend fun connect(qrData: QrData) {
+    override suspend fun connect(qrData: QrData) {
         val transport = qrData.transport ?: "softap" // Default to softap
         val transportType = if (transport.equals("ble", ignoreCase = true)) {
             ESPConstants.TransportType.TRANSPORT_BLE
@@ -131,13 +131,13 @@ class EspressifManager(context: Context) {
         }
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         espDevice?.disconnectDevice()
         espDevice = null
     }
 
 
-    suspend fun provision() {
+    override suspend fun provision() {
         val device = espDevice ?: throw IllegalStateException("Device not connected")
         val ssid = ssid ?: ""
         val password = password ?: ""
@@ -200,7 +200,7 @@ class EspressifManager(context: Context) {
         }
     }
 
-    suspend fun readCronData() {
+    override suspend fun readCronData() {
         val dn = deviceName ?: throw IllegalStateException("Device name not set")
 
         return suspendCancellableCoroutine { continuation ->
@@ -256,7 +256,7 @@ class EspressifManager(context: Context) {
         }
     }
 
-    suspend fun readPLog(): String {
+    override suspend fun readPLog(): String {
         val lines = mutableListOf<String>()
         var firstLine: String? = null
 
@@ -294,7 +294,7 @@ class EspressifManager(context: Context) {
         return reorderedLines.filter { it != "-" && it.isNotBlank() }.joinToString("\n")
     }
 
-    suspend fun writeCronData() {
+    override suspend fun writeCronData() {
         val cronData = packCronData(timeSlots)
 
         return suspendCancellableCoroutine { continuation ->
@@ -316,7 +316,7 @@ class EspressifManager(context: Context) {
         }
     }
 
-    suspend fun writeTimeData() {
+    override suspend fun writeTimeData() {
         /* Writes current time */
         val sdf = SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy", Locale.ENGLISH)
         val currentTime = sdf.format(Date())
@@ -369,7 +369,7 @@ class EspressifManager(context: Context) {
         return buffer.array()
     }
 
-    suspend fun writeAdvancedConfigs() {
+    override suspend fun writeAdvancedConfigs() {
         val device = espDevice ?: throw IllegalStateException("Device not connected")
 
         val timeServerBytes = (timeServer ?: "").toByteArray(Charsets.UTF_8) + 0.toByte()

@@ -82,6 +82,11 @@ dependencies {
     // Espressif Provisioning
     implementation(libs.esp.idf.provisioning)
     implementation(libs.eventbus)
+
+    // MQTT
+    implementation(libs.paho.mqtt)
+    implementation(libs.paho.android)
+    implementation(libs.localbroadcastmanager)
 }
 
 configurations.all {
@@ -93,4 +98,3 @@ configurations.all {
         }
     }
 }
-

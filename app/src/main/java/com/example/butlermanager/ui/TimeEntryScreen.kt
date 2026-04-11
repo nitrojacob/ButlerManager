@@ -42,14 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.example.butlermanager.EspressifManager
+import com.example.butlermanager.DeviceManager
 import com.example.butlermanager.data.TimeEntryConfiguration
 import com.example.butlermanager.data.TimeEntryDatabase
 import com.example.butlermanager.data.TimeSlot
 import kotlinx.coroutines.launch
 
 @Composable
-fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressifManager: EspressifManager) {
+fun TimeEntryScreenOfDevice(navController: NavController, name: String, deviceManager: DeviceManager) {
     val context = LocalContext.current
     val db = TimeEntryDatabase.getDatabase(context)
     val scope = rememberCoroutineScope()
@@ -83,7 +83,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                                                 db.timeEntryDao().getConfigurationWithTimeSlots(config.name)
                                             if (configWithTimeSlots != null) {
                                                 val importedTimeSlots = configWithTimeSlots.timeSlots
-                                                espressifManager.timeSlots = List(15) { index ->
+                                                deviceManager.timeSlots = List(15) { index ->
                                                     importedTimeSlots.find { it.rowIndex == index }?.copy(
                                                         id = 0,
                                                         configurationName = name
@@ -125,14 +125,14 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
             val destinationRoute = navController.currentBackStackEntry?.destination?.route
             if (destinationRoute?.startsWith("advanced_config/") != true && destinationRoute != "log_viewer") {
                 scope.launch {
-                    espressifManager.disconnect()
+                    deviceManager.disconnect()
                 }
             }
         }
     }
 
     LaunchedEffect(key1 = name) {
-        if (espressifManager.timeSlots.isEmpty() || espressifManager.timeSlots.first().configurationName != name) {
+        if (deviceManager.timeSlots.isEmpty() || deviceManager.timeSlots.first().configurationName != name) {
             scope.launch {
                 val configWithTimeSlots = db.timeEntryDao().getConfigurationWithTimeSlots(name)
                 val loadedTimeSlots = if (configWithTimeSlots != null) {
@@ -159,13 +159,13 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
                         )
                     }
                 }
-                espressifManager.timeSlots = loadedTimeSlots
-                espressifManager.initialTimeSlots = loadedTimeSlots
+                deviceManager.timeSlots = loadedTimeSlots
+                deviceManager.initialTimeSlots = loadedTimeSlots
             }
         }
     }
 
-    val isFormDirty = (espressifManager.timeSlots != espressifManager.initialTimeSlots) || advancedSettingsChanged
+    val isFormDirty = (deviceManager.timeSlots != deviceManager.initialTimeSlots) || advancedSettingsChanged
 
     Column(
         modifier = Modifier
@@ -177,8 +177,8 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
         Spacer(modifier = Modifier.height(16.dp))
 
         TimeEntryList(
-            timeSlots = espressifManager.timeSlots,
-            onTimeSlotsChanged = { espressifManager.timeSlots = it },
+            timeSlots = deviceManager.timeSlots,
+            onTimeSlotsChanged = { deviceManager.timeSlots = it },
             modifier = Modifier.weight(1f)
         )
 
@@ -195,13 +195,13 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, espressi
             onUpdate = {
                 scope.launch {
                     isProvisioning = true
-                    db.timeEntryDao().updateTimeSlotsForConfiguration(name, espressifManager.timeSlots)
-                    espressifManager.writeCronData()
+                    db.timeEntryDao().updateTimeSlotsForConfiguration(name, deviceManager.timeSlots)
+                    deviceManager.writeCronData()
                     if (advancedSettingsChanged) {
-                        espressifManager.writeAdvancedConfigs()
+                        deviceManager.writeAdvancedConfigs()
                     }
-                    espressifManager.provision()
-                    espressifManager.initialTimeSlots = espressifManager.timeSlots
+                    deviceManager.provision()
+                    deviceManager.initialTimeSlots = deviceManager.timeSlots
                     advancedSettingsChanged = false
                     isProvisioning = false
                     navController.popBackStack()

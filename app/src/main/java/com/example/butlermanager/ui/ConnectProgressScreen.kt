@@ -45,7 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import com.example.butlermanager.EspressifManager
+import com.example.butlermanager.DeviceManager
 import com.example.butlermanager.R
 import com.example.butlermanager.data.QrData
 import com.google.gson.Gson
@@ -92,10 +92,10 @@ fun rememberProvisioningSteps(): List<ProvisioningStep> {
 
 @Composable
 fun ConnectProgressScreen(
-    navController: NavController, qrDataJson: String, espressifManager: EspressifManager
+    navController: NavController, qrDataJson: String, deviceManager: DeviceManager
 ) {
     BackHandler {
-        espressifManager.disconnect()
+        deviceManager.disconnect()
         navController.popBackStack()
     }
 
@@ -228,19 +228,19 @@ fun ConnectProgressScreen(
             try {
                 updateStep(context.getString(R.string.connect_progress_step3), StepStatus.IN_PROGRESS)
                 withContext(Dispatchers.IO) {
-                    espressifManager.connect(qrData)
+                    deviceManager.connect(qrData)
                 }
                 updateStep(context.getString(R.string.connect_progress_step3), StepStatus.SUCCESS)
 
                 updateStep(context.getString(R.string.connect_progress_step4), StepStatus.IN_PROGRESS)
                 withContext(Dispatchers.IO) {
-                    espressifManager.writeTimeData()
+                    deviceManager.writeTimeData()
                 }
                 updateStep(context.getString(R.string.connect_progress_step4), StepStatus.SUCCESS)
 
                 updateStep(context.getString(R.string.connect_progress_step5), StepStatus.IN_PROGRESS)
                 withContext(Dispatchers.IO) {
-                    espressifManager.readCronData()
+                    deviceManager.readCronData()
                 }
                 updateStep(context.getString(R.string.connect_progress_step5), StepStatus.SUCCESS)
 
@@ -282,7 +282,7 @@ fun ConnectProgressScreen(
             },
             dismissButton = {
                 Button(onClick = {
-                    espressifManager.disconnect()
+                    deviceManager.disconnect()
                     navController.popBackStack()
                 }) {
                     Text(stringResource(R.string.cancel))
@@ -307,39 +307,47 @@ fun ConnectProgressScreen(
                     modifier = Modifier.padding(vertical = 4.dp)
                 ) {
                     val status = step.status.value
-                    val iconModifier = Modifier.size(24.dp)
-
-                    when (status) {
-                        StepStatus.PENDING -> Icon(
-                            imageVector = Icons.Filled.AccessTime,
-                            contentDescription = stringResource(R.string.pending),
-                            modifier = iconModifier,
-                            tint = Color.Gray
-                        )
-                        StepStatus.IN_PROGRESS -> CircularProgressIndicator(modifier = iconModifier)
-                        StepStatus.SUCCESS -> Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = stringResource(R.string.success),
-                            modifier = iconModifier,
-                            tint = Color(0xFF00C853) // A nice green
-                        )
-                        StepStatus.FAILURE -> Icon(
-                            imageVector = Icons.Filled.Warning,
-                            contentDescription = stringResource(R.string.failure),
-                            modifier = iconModifier,
-                            tint = Color.Red
-                        )
+                    val icon = when (status) {
+                        StepStatus.PENDING -> Icons.Filled.AccessTime
+                        StepStatus.IN_PROGRESS -> null
+                        StepStatus.SUCCESS -> Icons.Filled.CheckCircle
+                        StepStatus.FAILURE -> Icons.Filled.Warning
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = when (status) {
+                                StepStatus.SUCCESS -> Color(0xFF00C853)
+                                StepStatus.FAILURE -> Color.Red
+                                else -> Color.Gray
+                            },
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
 
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(text = step.title)
-                        if (step.errorText.value != null) {
-                            Text(text = step.errorText.value!!, color = Color.Red)
+                        step.errorText.value?.let {
+                            Text(text = it, color = Color.Red, modifier = Modifier.padding(top = 2.dp))
                         }
                     }
                 }
+            }
+        }
+
+        if (overallStatus == context.getString(R.string.failed_to_connect_to_device)) {
+            Button(
+                onClick = {
+                    navController.popBackStack()
+                },
+                modifier = Modifier.padding(top = 32.dp)
+            ) {
+                Text("Back")
             }
         }
     }

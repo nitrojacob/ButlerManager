@@ -37,11 +37,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.butlermanager.EspressifManager
+import com.example.butlermanager.DeviceManager
 import kotlinx.coroutines.launch
 
 @Composable
-fun LogViewerScreen(navController: NavController, espressifManager: EspressifManager) {
+fun LogViewerScreen(navController: NavController, deviceManager: DeviceManager) {
     var logs by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -52,7 +52,7 @@ fun LogViewerScreen(navController: NavController, espressifManager: EspressifMan
             isLoading = true
             errorMessage = null
             try {
-                logs = espressifManager.readPLog()
+                logs = deviceManager.readPLog()
             } catch (e: Exception) {
                 Log.e("LogViewerScreen", "Error fetching logs", e)
                 errorMessage = "Error: ${e.message}"
@@ -62,7 +62,7 @@ fun LogViewerScreen(navController: NavController, espressifManager: EspressifMan
         }
     }
 
-    LaunchedEffect(espressifManager) {
+    LaunchedEffect(deviceManager) {
         fetchLogs()
     }
 

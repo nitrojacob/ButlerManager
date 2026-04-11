@@ -15,10 +15,14 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,113 +100,128 @@ fun QrScannerScreen(navController: NavController) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        if (hasCameraPermission) {
-            Log.d(TAG, "Camera permission is granted, showing camera preview.")
-            
-            Text(
-                text = "Scan a device QR code to connect",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (hasCameraPermission) {
+                Log.d(TAG, "Camera permission is granted, showing camera preview.")
+                
+                Text(
+                    text = "Scan a device QR code to connect",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
 
-            Box(
-                modifier = Modifier
-                    .size(240.dp, 240.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            ) {
-                AndroidView(
-                    factory = { ctx ->
-                        Log.d(TAG, "AndroidView factory called")
-                        val previewView = PreviewView(ctx).apply {
-                            this.scaleType = PreviewView.ScaleType.FILL_CENTER
-                            this.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                        }
-                        val cameraExecutor = Executors.newSingleThreadExecutor()
-
-                        cameraProviderFuture.addListener({
-                            Log.d(TAG, "cameraProviderFuture listener triggered")
-                            val cameraProvider = cameraProviderFuture.get()
-                            val preview = androidx.camera.core.Preview.Builder().build().also {
-                                it.setSurfaceProvider(previewView.surfaceProvider)
+                Box(
+                    modifier = Modifier
+                        .size(240.dp, 240.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                ) {
+                    AndroidView(
+                        factory = { ctx ->
+                            Log.d(TAG, "AndroidView factory called")
+                            val previewView = PreviewView(ctx).apply {
+                                this.scaleType = PreviewView.ScaleType.FILL_CENTER
+                                this.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                             }
+                            val cameraExecutor = Executors.newSingleThreadExecutor()
 
-                            val imageAnalysis = ImageAnalysis.Builder()
-                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                .build()
+                            cameraProviderFuture.addListener({
+                                Log.d(TAG, "cameraProviderFuture listener triggered")
+                                val cameraProvider = cameraProviderFuture.get()
+                                val preview = androidx.camera.core.Preview.Builder().build().also {
+                                    it.setSurfaceProvider(previewView.surfaceProvider)
+                                }
 
-                            imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                                val image = imageProxy.image
-                                if (image != null) {
-                                    val inputImage = InputImage.fromMediaImage(image, imageProxy.imageInfo.rotationDegrees)
-                                    val scanner = BarcodeScanning.getClient()
-                                    scanner.process(inputImage)
-                                        .addOnSuccessListener { barcodes ->
-                                            if (barcodes.isNotEmpty()) {
-                                                barcodes.first().rawValue?.let { rawValue ->
-                                                    Log.d(TAG, "QR Code detected: $rawValue")
-                                                    try {
-                                                        val qrData = Gson().fromJson(rawValue, QrData::class.java)
-                                                        Log.d(TAG, "Parsed QR data: $qrData")
+                                val imageAnalysis = ImageAnalysis.Builder()
+                                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                    .build()
 
-                                                        coroutineScope.launch {
-                                                            db.qrDataDao().insert(qrData)
+                                imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                                    val image = imageProxy.image
+                                    if (image != null) {
+                                        val inputImage = InputImage.fromMediaImage(image, imageProxy.imageInfo.rotationDegrees)
+                                        val scanner = BarcodeScanning.getClient()
+                                        scanner.process(inputImage)
+                                            .addOnSuccessListener { barcodes ->
+                                                if (barcodes.isNotEmpty()) {
+                                                    barcodes.first().rawValue?.let { rawValue ->
+                                                        Log.d(TAG, "QR Code detected: $rawValue")
+                                                        try {
+                                                            val qrData = Gson().fromJson(rawValue, QrData::class.java)
+                                                            Log.d(TAG, "Parsed QR data: $qrData")
+
+                                                            coroutineScope.launch {
+                                                                db.qrDataDao().insert(qrData)
+                                                            }
+
+                                                            imageAnalysis.clearAnalyzer()
+                                                            cameraProvider.unbindAll()
+                                                            Log.d(TAG, "Navigating to connectProgress screen")
+                                                            val qrDataJson = Gson().toJson(qrData)
+                                                            val encodedQrData = URLEncoder.encode(qrDataJson, StandardCharsets.UTF_8.toString())
+                                                            navController.navigate("connectProgress/$encodedQrData")
+                                                        } catch (e: Exception) {
+                                                            Log.e(TAG, "Error parsing QR code JSON", e)
                                                         }
-
-                                                        imageAnalysis.clearAnalyzer()
-                                                        cameraProvider.unbindAll()
-                                                        Log.d(TAG, "Navigating to connectProgress screen")
-                                                        val qrDataJson = Gson().toJson(qrData)
-                                                        val encodedQrData = URLEncoder.encode(qrDataJson, StandardCharsets.UTF_8.toString())
-                                                        navController.navigate("connectProgress/$encodedQrData")
-                                                    } catch (e: Exception) {
-                                                        Log.e(TAG, "Error parsing QR code JSON", e)
                                                     }
                                                 }
                                             }
-                                        }
-                                        .addOnFailureListener { e -> Log.e(TAG, "Barcode scanning failed", e) }
-                                        .addOnCompleteListener { imageProxy.close() }
-                                } else {
-                                    imageProxy.close()
+                                            .addOnFailureListener { e -> Log.e(TAG, "Barcode scanning failed", e) }
+                                            .addOnCompleteListener { imageProxy.close() }
+                                    } else {
+                                        imageProxy.close()
+                                    }
                                 }
-                            }
 
-                            val selector = CameraSelector.Builder()
-                                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-                                .build()
-
-                            previewView.post {
-                                Log.d(TAG, "Setting up camera use cases")
-                                val useCaseGroup = UseCaseGroup.Builder()
-                                    .addUseCase(preview)
-                                    .addUseCase(imageAnalysis)
+                                val selector = CameraSelector.Builder()
+                                    .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                                     .build()
-                                try {
-                                    cameraProvider.unbindAll()
-                                    val camera = cameraProvider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        selector,
-                                        useCaseGroup
-                                    )
-                                    camera.cameraControl.setZoomRatio(2.0f)
-                                    Log.d(TAG, "Camera bound to lifecycle")
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Failed to bind camera", e)
-                                }
-                            }
-                        }, ContextCompat.getMainExecutor(ctx))
 
-                        previewView
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                                previewView.post {
+                                    Log.d(TAG, "Setting up camera use cases")
+                                    val useCaseGroup = UseCaseGroup.Builder()
+                                        .addUseCase(preview)
+                                        .addUseCase(imageAnalysis)
+                                        .build()
+                                    try {
+                                        cameraProvider.unbindAll()
+                                        val camera = cameraProvider.bindToLifecycle(
+                                            lifecycleOwner,
+                                            selector,
+                                            useCaseGroup
+                                        )
+                                        camera.cameraControl.setZoomRatio(2.0f)
+                                        Log.d(TAG, "Camera bound to lifecycle")
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Failed to bind camera", e)
+                                    }
+                                }
+                            }, ContextCompat.getMainExecutor(ctx))
+
+                            previewView
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            } else {
+                Text("Camera permission is required to scan QR codes.")
             }
-        } else {
-            Text("Camera permission is required to scan QR codes.")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { navController.navigate("networkModeHome") },
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            Text("View Devices in Network Mode")
         }
     }
 

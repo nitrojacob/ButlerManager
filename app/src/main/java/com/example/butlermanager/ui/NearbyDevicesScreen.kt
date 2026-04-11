@@ -286,7 +286,7 @@ fun NearbyDevicesScreen(navController: NavController) {
         Spacer(modifier = Modifier.padding(8.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
@@ -302,6 +302,13 @@ fun NearbyDevicesScreen(navController: NavController) {
             ) {
                 Text("Saved Configs")
             }
+        }
+
+        Button(
+            onClick = { navController.navigate("networkModeHome") },
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            Text("View Devices in Network Mode")
         }
     }
 }
