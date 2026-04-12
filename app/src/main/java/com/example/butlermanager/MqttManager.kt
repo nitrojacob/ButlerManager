@@ -95,26 +95,20 @@ class MqttManager(private val context: Context) : DeviceManager {
     }
 
     override suspend fun readCronData() {
-        Log.d(TAG, "readCronData: Starting to read cron data for device: $deviceName")
         val dn = deviceName ?: throw IllegalStateException("Device name not set")
         val topic = getName() + "nvCron/rd"
         val responseTopic = topic + "Data"
-        Log.d(TAG, "readCronData: Request topic: $topic, Response topic: $responseTopic")
         
         val requestData = byteArrayOf(0, 24, 0, 0)
         try {
             val response = sendAndReceive(topic, responseTopic, requestData)
-            Log.d(TAG, "readCronData: Received response of size ${response.size} bytes")
             
             scope.launch {
                 try {
-                    Log.d(TAG, "readCronData: Parsing response data into time slots")
                     val parsedTimeSlots = parseCronData(dn, response)
-                    Log.d(TAG, "readCronData: Parsed ${parsedTimeSlots.size} time slots successfully")
                     
                     timeSlots = parsedTimeSlots
                     timeEntryDao.updateTimeSlotsForConfiguration(dn, parsedTimeSlots)
-                    Log.d(TAG, "readCronData: Database updated with ${parsedTimeSlots.size} time slots for $dn")
                 } catch (e: Exception) {
                     Log.e(TAG, "readCronData: Failed to parse or update time slots in database", e)
                 }
@@ -125,23 +119,48 @@ class MqttManager(private val context: Context) : DeviceManager {
         }
     }
 
-    override suspend fun readPLog(): String {
+    private suspend fun readPLogLine(): String? {
         val topic = getName() + "plogRd"
         val responseTopic = topic + "Data"
-        val response = sendAndReceive(topic, responseTopic, byteArrayOf(0, 0, 0, 0))
-        val rawLog = response.toString(Charsets.UTF_8).trimEnd('\u0000')
-        
-        val lines = rawLog.split("\n").filter { it.isNotBlank() }
+        return try {
+            val response = sendAndReceive(topic, responseTopic, byteArrayOf(0, 0, 0, 0))
+            response.toString(Charsets.UTF_8).trimEnd('\u0000')
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read PLog line", e)
+            null
+        }
+    }
+
+    override suspend fun readPLog(): String {
+        val lines = mutableListOf<String>()
+        var firstLine: String? = null
+
+        while (true) {
+            val line = readPLogLine() ?: break
+            if (line.isEmpty()) break
+
+            if (firstLine == null) {
+                firstLine = line
+            } else if (line == firstLine) {
+                break
+            }
+            lines.add(line)
+            
+            if (lines.size > 1000) break 
+        }
+
         if (lines.isEmpty()) return ""
 
         val dashIndex = lines.indexOf("-")
-        if (dashIndex == -1) return rawLog
+        if (dashIndex == -1) {
+            return lines.joinToString("\n")
+        }
 
         val oldestPart = lines.subList(dashIndex + 1, lines.size)
         val newestPart = lines.subList(0, dashIndex)
         val reorderedLines = oldestPart + newestPart
         
-        return reorderedLines.filter { it != "-" }.joinToString("\n")
+        return reorderedLines.filter { it != "-" && it.isNotBlank() }.joinToString("\n")
     }
 
     override suspend fun writeCronData() {

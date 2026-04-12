@@ -15,4 +15,7 @@ interface QrDataDao {
 
     @Query("SELECT * FROM qr_data")
     suspend fun getAllQrData(): List<QrData>
+
+    @Query("DELETE FROM qr_data WHERE name = :name")
+    suspend fun deleteQrDataByName(name: String)
 }
