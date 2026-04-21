@@ -44,6 +44,9 @@ class EspressifManager(context: Context) : DeviceManager {
     override var otaHost: String? = "iothub.local"
     override var timeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
     override var initialTimeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
+    
+    override var isConnected by mutableStateOf(false)
+        private set
 
     private fun getName(): String {
         val mac = mac ?: ""
@@ -87,6 +90,10 @@ class EspressifManager(context: Context) : DeviceManager {
             val subscriber = object {
                 @Subscribe(threadMode = ThreadMode.MAIN)
                 fun onDeviceConnectionEvent(event: DeviceConnectionEvent) {
+                    if (event.eventType == ESPConstants.EVENT_DEVICE_CONNECTED || event.eventType == ESPConstants.EVENT_DEVICE_CONNECTION_FAILED || event.eventType == ESPConstants.EVENT_DEVICE_DISCONNECTED) {
+                         isConnected = event.eventType == ESPConstants.EVENT_DEVICE_CONNECTED
+                    }
+                    
                     // Once we get an event, unregister the listener to avoid leaks and multiple callbacks.
                     if (eventBus.isRegistered(this)) {
                         eventBus.unregister(this)
@@ -134,6 +141,7 @@ class EspressifManager(context: Context) : DeviceManager {
     override fun disconnect() {
         espDevice?.disconnectDevice()
         espDevice = null
+        isConnected = false
     }
 
 
@@ -292,6 +300,46 @@ class EspressifManager(context: Context) : DeviceManager {
         val reorderedLines = oldestPart + newestPart
         
         return reorderedLines.filter { it != "-" && it.isNotBlank() }.joinToString("\n")
+    }
+
+    override suspend fun readVersion(): String {
+        return suspendCancellableCoroutine { continuation ->
+            sendStateProbeOverProv("version", byteArrayOf(0, 0, 0, 0), object : ResponseListener {
+                override fun onSuccess(response: ByteArray?) {
+                    if (continuation.isActive) {
+                        val version = response?.toString(Charsets.UTF_8)?.trimEnd('\u0000') ?: "Unknown"
+                        continuation.resume(version)
+                    }
+                }
+
+                override fun onFailure(e: Exception) {
+                    Log.e(TAG, "Failed to read version", e)
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(e)
+                    }
+                }
+            })
+        }
+    }
+
+    override suspend fun readSysStat(): String {
+        return suspendCancellableCoroutine { continuation ->
+            sendStateProbeOverProv("sysStat", byteArrayOf(0, 0, 0, 0), object : ResponseListener {
+                override fun onSuccess(response: ByteArray?) {
+                    if (continuation.isActive) {
+                        val sysStat = response?.toString(Charsets.UTF_8)?.trimEnd('\u0000') ?: "Unknown"
+                        continuation.resume(sysStat)
+                    }
+                }
+
+                override fun onFailure(e: Exception) {
+                    Log.e(TAG, "Failed to read sysStat", e)
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(e)
+                    }
+                }
+            })
+        }
     }
 
     override suspend fun writeCronData() {

@@ -11,12 +11,15 @@ interface DeviceManager {
     var timeServer: String?
     var mqttBroker: String?
     var otaHost: String?
+    val isConnected: Boolean
     
     suspend fun connect(qrData: QrData)
     fun disconnect()
     suspend fun provision()
     suspend fun readCronData()
     suspend fun readPLog(): String
+    suspend fun readVersion(): String
+    suspend fun readSysStat(): String
     suspend fun writeCronData()
     suspend fun writeTimeData()
     suspend fun writeAdvancedConfigs()

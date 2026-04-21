@@ -34,6 +34,7 @@ import com.example.butlermanager.ui.QrScannerScreen
 import com.example.butlermanager.ui.SavedConfigsScreen
 import com.example.butlermanager.ui.TimeEntryScreenOfConfig
 import com.example.butlermanager.ui.TimeEntryScreenOfDevice
+import com.example.butlermanager.ui.VersionScreen
 import com.example.butlermanager.ui.theme.ButlerManagerTheme
 
 class MainActivity : ComponentActivity() {
@@ -138,6 +139,11 @@ fun AppNavigation() {
             composable("log_viewer") {
                 currentDeviceManager?.let { manager ->
                     LogViewerScreen(navController = navController, deviceManager = manager)
+                }
+            }
+            composable("version_screen") {
+                currentDeviceManager?.let { manager ->
+                    VersionScreen(navController = navController, deviceManager = manager)
                 }
             }
             composable("savedConfigs") {

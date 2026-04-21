@@ -42,6 +42,9 @@ class MqttManager(private val context: Context) : DeviceManager {
     override var otaHost: String? = "iothub.local"
     override var timeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
     override var initialTimeSlots by mutableStateOf<List<TimeSlot>>(emptyList())
+    
+    override var isConnected by mutableStateOf(false)
+        private set
 
     private fun getName(): String {
         val mac = mac ?: ""
@@ -60,20 +63,39 @@ class MqttManager(private val context: Context) : DeviceManager {
             isCleanSession = false
         }
 
+        client.setCallback(object : MqttCallbackExtended {
+            override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+                isConnected = true
+            }
+
+            override fun connectionLost(cause: Throwable?) {
+                isConnected = false
+            }
+
+            override fun messageArrived(topic: String?, message: MqttMessage?) {
+                // Global message handler could be implemented here
+            }
+
+            override fun deliveryComplete(token: IMqttDeliveryToken?) {}
+        })
+
         return suspendCancellableCoroutine { continuation ->
             try {
                 client.connect(options, null, object : IMqttActionListener {
                     override fun onSuccess(asyncActionToken: IMqttToken?) {
                         Log.d(TAG, "MQTT Connected to $brokerUrl")
+                        isConnected = true
                         continuation.resume(Unit)
                     }
 
                     override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                         Log.e(TAG, "MQTT Connection failed", exception)
+                        isConnected = false
                         continuation.resumeWithException(exception ?: Exception("Failed to connect to MQTT broker"))
                     }
                 })
             } catch (e: MqttException) {
+                isConnected = false
                 continuation.resumeWithException(e)
             }
         }
@@ -86,6 +108,7 @@ class MqttManager(private val context: Context) : DeviceManager {
             Log.e(TAG, "Error disconnecting MQTT", e)
         }
         mqttClient = null
+        isConnected = false
     }
 
     // Mocking provision as it doesn't apply to pure MQTT mode in the same way, 
@@ -163,6 +186,30 @@ class MqttManager(private val context: Context) : DeviceManager {
         return reorderedLines.filter { it != "-" && it.isNotBlank() }.joinToString("\n")
     }
 
+    override suspend fun readVersion(): String {
+        val topic = getName() + "version"
+        val responseTopic = topic + "Data"
+        return try {
+            val response = sendAndReceive(topic, responseTopic, byteArrayOf(0, 0, 0, 0))
+            response.toString(Charsets.UTF_8).trimEnd('\u0000')
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read version", e)
+            "Unknown"
+        }
+    }
+
+    override suspend fun readSysStat(): String {
+        val topic = getName() + "sysStat"
+        val responseTopic = topic + "Data"
+        return try {
+            val response = sendAndReceive(topic, responseTopic, byteArrayOf(0, 0, 0, 0))
+            response.toString(Charsets.UTF_8).trimEnd('\u0000')
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read sysStat", e)
+            "Unknown"
+        }
+    }
+
     override suspend fun writeCronData() {
         val topic = getName() + "nvCron/wr"
         val cronData = packCronData(timeSlots)
@@ -208,33 +255,27 @@ class MqttManager(private val context: Context) : DeviceManager {
         val client = mqttClient ?: throw IllegalStateException("MQTT client not connected")
         
         return suspendCancellableCoroutine { continuation ->
-            val callback = object : MqttCallbackExtended {
-                override fun connectComplete(reconnect: Boolean, serverURI: String?) {}
-                override fun connectionLost(cause: Throwable?) {}
+            val tempCallback = object : MqttCallbackExtended {
+                override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+                    isConnected = true
+                }
+                override fun connectionLost(cause: Throwable?) {
+                    isConnected = false
+                }
                 override fun deliveryComplete(token: IMqttDeliveryToken?) {}
 
                 override fun messageArrived(receivedTopic: String?, message: MqttMessage?) {
                     if (receivedTopic == responseTopic) {
-                        client.setCallback(null) // Reset callback
-                        try {
-                            client.unsubscribe(responseTopic)
-                        } catch (e: Exception) {}
                         continuation.resume(message?.payload ?: byteArrayOf())
                     }
                 }
             }
             
-            client.setCallback(callback)
+            client.setCallback(tempCallback)
             
             try {
                 client.subscribe(responseTopic, 1, null, object : IMqttActionListener {
                     override fun onSuccess(asyncActionToken: IMqttToken?) {
-                        // Once subscribed, publish the request
-                        // Note: The device needs to know where to send the response. 
-                        // For simplicity in this "identical API" version, we assume the device 
-                        // is programmed to respond to a specific scheme or the responseTopic is 
-                        // part of a header if supported.
-                        // Here we just publish the raw data as EspressifManager does.
                         try {
                             client.publish(topic, data, 1, false)
                         } catch (e: Exception) {
@@ -248,10 +289,6 @@ class MqttManager(private val context: Context) : DeviceManager {
                 })
             } catch (e: Exception) {
                 continuation.resumeWithException(e)
-            }
-            
-            continuation.invokeOnCancellation {
-                client.setCallback(null)
             }
         }
     }

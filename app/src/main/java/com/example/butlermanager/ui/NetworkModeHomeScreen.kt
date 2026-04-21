@@ -1,18 +1,27 @@
 package com.example.butlermanager.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -56,65 +66,92 @@ fun NetworkModeHomeScreen(navController: NavController, mqttManager: MqttManager
         loadDevices()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        OutlinedTextField(
-            value = brokerHostname,
-            onValueChange = { brokerHostname = it },
-            label = { Text("Broker Hostname") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        Text(
-            text = "Devices",
-            modifier = Modifier.padding(vertical = 16.dp)
-        )
-
-        if (isConnecting) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-        }
-
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            items(devices) { device ->
-                Card(
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = brokerHostname,
+                    onValueChange = { brokerHostname = it },
+                    label = { Text("Broker Hostname") },
+                    modifier = Modifier.weight(1f)
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            enabled = !isConnecting,
-                            onClick = {
-                                coroutineScope.launch {
-                                    isConnecting = true
-                                    try {
-                                        mqttManager.setBrokerUrl(brokerHostname)
-                                        mqttManager.connect(device)
-                                        mqttManager.readCronData()
-                                        navController.navigate("timeEntryDevice/${device.name ?: ""}")
-                                    } catch (e: Exception) {
-                                        // Handle error (e.g., show toast)
-                                    } finally {
-                                        isConnecting = false
-                                    }
-                                }
-                            },
-                            onLongClick = {
-                                deviceToDelete = device
-                            }
+                        .size(16.dp)
+                        .background(
+                            color = if (mqttManager.isConnected) Color.Green else Color.Red,
+                            shape = CircleShape
                         )
-                ) {
-                    Column(
+                )
+            }
+            
+            Text(
+                text = "Devices",
+                modifier = Modifier.padding(vertical = 16.dp),
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(devices) { device ->
+                    Card(
                         modifier = Modifier
-                            .padding(16.dp)
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                enabled = !isConnecting,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        isConnecting = true
+                                        try {
+                                            mqttManager.setBrokerUrl(brokerHostname)
+                                            mqttManager.connect(device)
+                                            mqttManager.readCronData()
+                                            navController.navigate("timeEntryDevice/${device.name ?: ""}")
+                                        } catch (e: Exception) {
+                                            // Handle error
+                                        } finally {
+                                            isConnecting = false
+                                        }
+                                    }
+                                },
+                                onLongClick = {
+                                    deviceToDelete = device
+                                }
+                            )
                     ) {
-                        Text(text = device.name ?: "Unknown Device")
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                        ) {
+                            Text(text = device.name ?: "Unknown Device")
+                        }
                     }
                 }
+            }
+        }
+
+        if (isConnecting) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable(enabled = false) { },
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
         }
     }

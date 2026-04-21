@@ -1,6 +1,7 @@
 package com.example.butlermanager.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,12 +19,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +62,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, deviceMa
     var isProvisioning by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var allConfigs by remember { mutableStateOf<List<TimeEntryConfiguration>>(emptyList()) }
+    var showMenu by remember { mutableStateOf(false) }
 
     BackHandler {
         navController.popBackStack()
@@ -123,7 +129,7 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, deviceMa
     DisposableEffect(navController) {
         onDispose {
             val destinationRoute = navController.currentBackStackEntry?.destination?.route
-            if (destinationRoute?.startsWith("advanced_config/") != true && destinationRoute != "log_viewer") {
+            if (destinationRoute?.startsWith("advanced_config/") != true && destinationRoute != "log_viewer" && destinationRoute != "version_screen") {
                 scope.launch {
                     deviceManager.disconnect()
                 }
@@ -173,7 +179,48 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, deviceMa
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = name, fontSize = 24.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = name, fontSize = 24.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(24.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box {
+                IconButton(onClick = { showMenu = true }, enabled = !isProvisioning) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Advanced") },
+                        onClick = {
+                            showMenu = false
+                            navController.navigate("advanced_config/$name")
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Logs") },
+                        onClick = {
+                            showMenu = false
+                            navController.navigate("log_viewer")
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Version") },
+                        onClick = {
+                            showMenu = false
+                            navController.navigate("version_screen")
+                        }
+                    )
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         TimeEntryList(
@@ -188,8 +235,6 @@ fun TimeEntryScreenOfDevice(navController: NavController, name: String, deviceMa
         Spacer(modifier = Modifier.height(16.dp))
 
         ConnectProgressButtons(
-            navController = navController,
-            name = name,
             isProvisioning = isProvisioning,
             isFormDirty = isFormDirty,
             onUpdate = {
@@ -385,8 +430,6 @@ private fun TimeEntryList(
 
 @Composable
 private fun ConnectProgressButtons(
-    navController: NavController,
-    name: String,
     isProvisioning: Boolean,
     isFormDirty: Boolean,
     onUpdate: () -> Unit,
@@ -398,24 +441,6 @@ private fun ConnectProgressButtons(
             enabled = !isProvisioning
         ) {
             Text("Import")
-        }
-        Spacer(modifier = Modifier.width(4.dp))
-        Button(
-            onClick = {
-                navController.navigate("advanced_config/$name")
-            },
-            enabled = !isProvisioning
-        ) {
-            Text("Adv")
-        }
-        Spacer(modifier = Modifier.width(4.dp))
-        Button(
-            onClick = {
-                navController.navigate("log_viewer")
-            },
-            enabled = !isProvisioning
-        ) {
-            Text("Logs")
         }
         Spacer(modifier = Modifier.width(4.dp))
         Button(
