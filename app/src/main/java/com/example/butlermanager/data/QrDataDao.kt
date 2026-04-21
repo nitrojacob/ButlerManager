@@ -6,16 +6,16 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
-interface QrDataDao {
+abstract class QrDataDao {
     @Query("SELECT * FROM qr_data WHERE name = :name")
-    suspend fun getQrDataByName(name: String): QrData?
+    abstract suspend fun getQrDataByName(name: String): QrData?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(qrData: QrData)
+    abstract suspend fun insert(qrData: QrData): Long
 
     @Query("SELECT * FROM qr_data")
-    suspend fun getAllQrData(): List<QrData>
+    abstract suspend fun getAllQrData(): List<QrData>
 
     @Query("DELETE FROM qr_data WHERE name = :name")
-    suspend fun deleteQrDataByName(name: String)
+    abstract suspend fun deleteQrDataByName(name: String): Int
 }
